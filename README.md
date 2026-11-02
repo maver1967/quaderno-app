@@ -16,10 +16,21 @@ personale salvato sul dispositivo. Questa repo contiene solo codice.
 | `app.js` | sidebar, rotte, viste, ricerca |
 | `fonte.js` | lettura/scrittura dei dati (file locali o API GitHub) |
 | `markdown.js` | renderer Markdown |
+| `modifica.js` | editor: controlli per tipo, composizione del file, salvataggio |
 
 L'app è generica: non sa cosa sia un "task". Legge gli `_schema.json` della
 repo dei dati e si disegna di conseguenza. Per aggiungere un database basta
 scrivere un file JSON, senza toccare il codice.
+
+## Modifica
+
+Quando la fonte è configurata su GitHub le proprietà diventano modificabili e
+il testo si scrive in Markdown. Si salva sempre il **file intero**, mai una
+patch: il file è la verità, l'indice è una cache.
+
+Ogni file porta lo `sha` dell'ultima lettura. Se nel frattempo è cambiato
+(altro dispositivo, Action), GitHub rifiuta la scrittura e l'app avvisa invece
+di sovrascrivere in silenzio.
 
 ## Viste
 

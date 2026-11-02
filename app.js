@@ -6,6 +6,7 @@
 
 import { creaFonte, configurazione, FonteGitHub } from './fonte.js';
 import { markdown, separaFrontmatter } from './markdown.js';
+import { controllo, salva, avviso, nuovoId, nomeFile } from './modifica.js';
 
 let fonte = creaFonte();
 const $ = (s, r = document) => r.querySelector(s);
@@ -307,10 +308,17 @@ function paginaDatabase(rotta) {
     })),
     el('span', { class: 'conteggio', testo: `${elementi.length} di ${db.elementi.length}` }));
 
+  const nuovo = fonte.scrivibile ? el('button', {
+    class: 'scheda-vista',
+    style: 'border:1px solid var(--bordo-forte);border-radius:4px;padding:6px 13px;margin:12px 0 0',
+    onclick: () => creaElemento(rotta.db), testo: '+ Nuovo',
+  }) : null;
+
   return el('div', { class: 'contenitore' },
     el('h1', { class: 'titolo-pagina' },
       el('span', { class: 'icona', testo: schema.icona || '▦' }), schema.nome),
     schema.descrizione ? el('p', { class: 'sottotitolo', testo: schema.descrizione }) : null,
+    nuovo,
     barra,
     elementi.length
       ? disegnaVista(vista, elementi, schema)
@@ -318,24 +326,112 @@ function paginaDatabase(rotta) {
 }
 
 async function paginaElemento(file) {
-  const testo = await fonte.file(file);
-  const [campi, corpo] = separaFrontmatter(testo);
-  const db = Object.values(INDICE.database)
-    .find((d) => d.elementi.some((e) => e._file === file));
-  const props = db?.schema.proprieta || {};
+  const { testo } = await fonte.fileConSha(file);
+  const [campi, corpoIniziale] = separaFrontmatter(testo);
+  const voce = Object.entries(INDICE.database)
+    .find(([, d]) => d.elementi.some((e) => e._file === file));
+  const dbId = voce?.[0];
+  const schema = voce?.[1].schema;
+  const props = schema?.proprieta || {};
 
+  // stato locale della modifica
+  const bozza = { ...campi };
+  let corpo = corpoIniziale;
+  let sporco = false;
+
+  const barra = el('div', { style: 'display:flex;gap:8px;align-items:center;margin:14px 0 4px' });
+
+  // quando ci sono modifiche la barra si aggancia in basso: su una nota lunga
+  // o su telefono il bottone Salva deve restare raggiungibile senza scorrere.
+  const ancoraBarra = () => {
+    barra.setAttribute('style',
+      'position:sticky;bottom:0;z-index:6;display:flex;gap:8px;align-items:center;' +
+      'margin:14px -16px 0;padding:12px 16px;background:var(--sfondo);' +
+      'border-top:1px solid var(--bordo)');
+  };
+  const bottone = (etichetta, azione, principale) => el('button', {
+    class: 'scheda-vista',
+    style: `border:1px solid var(--bordo-forte);border-radius:4px;padding:6px 13px;${
+      principale ? 'background:var(--testo);color:var(--sfondo);border-color:var(--testo)' : ''}`,
+    onclick: azione, testo: etichetta,
+  });
+
+  const segnaSporco = () => {
+    if (sporco) return;
+    sporco = true;
+    ancoraBarra();
+    barra.replaceChildren(
+      bottone('Salva', eseguiSalvataggio, true),
+      bottone('Annulla', () => disegnaRotta(leggiRotta())),
+      el('span', { class: 'muto', testo: 'modifiche non salvate' }));
+  };
+
+  async function eseguiSalvataggio() {
+    avviso('Salvo…');
+    const r = await salva({ fonte, indice: INDICE, dbId, file, schema, campi: bozza, corpo });
+    if (r.esito === 'ok') {
+      avviso('Salvato', 'ok');
+      sporco = false;
+      disegnaRotta(leggiRotta());
+    } else {
+      avviso(r.messaggio, r.esito === 'conflitto' ? 'conflitto' : 'errore');
+    }
+  }
+
+  // --- proprieta'
   const righe = Object.entries(props)
-    .filter(([k]) => k !== 'titolo' && campi[k] !== undefined && campi[k] !== null)
-    .map(([k, p]) => el('div', { class: 'prop-riga' },
-      el('div', { class: 'prop-nome', testo: p.etichetta || k }),
-      el('div', {}, cella(p, campi[k], k))));
+    .filter(([k]) => k !== 'titolo')
+    .map(([k, prop]) => el('div', { class: 'prop-riga' },
+      el('div', { class: 'prop-nome', testo: prop.etichetta || k }),
+      el('div', { style: 'flex:1;min-width:0' },
+        fonte.scrivibile
+          ? controllo(prop, bozza[k], (v) => { bozza[k] = v; segnaSporco(); })
+          : cella(prop, bozza[k], k))));
+
+  // --- titolo
+  const titolo = fonte.scrivibile
+    ? el('input', {
+        class: 'titolo-pagina', value: bozza.titolo || '',
+        style: 'width:100%;border:0;background:none;outline:none;padding:0',
+        'aria-label': 'Titolo',
+        onchange: (e) => { bozza.titolo = e.target.value; segnaSporco(); },
+      })
+    : el('h1', { class: 'titolo-pagina', testo: bozza.titolo || '(senza titolo)' });
+
+  // --- corpo: si legge come documento, si modifica in un riquadro
+  const vistaCorpo = el('div', { class: 'documento', html: markdown(corpo) });
+  const zonaCorpo = el('div', {}, vistaCorpo);
+
+  const apriEditor = () => {
+    const ta = el('textarea', {
+      class: 'sb-cerca',
+      style: 'width:100%;min-height:320px;font:inherit;line-height:1.6;resize:vertical;padding:12px',
+      'aria-label': 'Testo della nota',
+    });
+    ta.value = corpo;
+    ta.addEventListener('input', () => { corpo = ta.value; segnaSporco(); });
+    zonaCorpo.replaceChildren(
+      el('div', { class: 'muto', style: 'font-size:13px;margin-bottom:6px',
+                  testo: 'Markdown: **grassetto**, # titolo, - elenco, - [ ] casella' }),
+      ta,
+      el('div', { style: 'margin-top:8px' },
+        bottone('Anteprima', () => {
+          vistaCorpo.innerHTML = markdown(corpo);
+          zonaCorpo.replaceChildren(vistaCorpo, el('div', { style: 'margin-top:8px' },
+            bottone('Modifica il testo', apriEditor)));
+        })));
+    ta.focus();
+  };
 
   return el('div', { class: 'contenitore' },
-    el('h1', { class: 'titolo-pagina' },
-      campi.icona ? el('span', { class: 'icona', testo: campi.icona }) : null,
-      campi.titolo || '(senza titolo)'),
+    titolo,
     righe.length ? el('div', { class: 'proprieta' }, righe) : null,
-    el('div', { class: 'documento', html: markdown(corpo) }));
+    fonte.scrivibile
+      ? el('div', { style: 'margin:10px 0' }, bottone('Modifica il testo', apriEditor))
+      : el('div', { class: 'muto', style: 'margin:10px 0;font-size:13px',
+                    testo: 'Sola lettura: collega GitHub nelle Impostazioni per modificare.' }),
+    zonaCorpo,
+    barra);
 }
 
 async function paginaNota(file) {
@@ -433,6 +529,30 @@ function paginaImpostazioni() {
                          onclick: () => { configurazione.cancella(); location.reload(); }, testo: 'Scollega' })
         : null),
     esito);
+}
+
+/** Crea un elemento vuoto nel database e lo apre. */
+async function creaElemento(dbId) {
+  const db = INDICE.database[dbId];
+  const schema = db.schema;
+  const titolo = prompt(`Titolo del nuovo elemento in "${schema.nome}":`);
+  if (titolo === null || !titolo.trim()) return;
+
+  const campi = { id: nuovoId(dbId.slice(0, 3)), titolo: titolo.trim() };
+  for (const [k, p] of Object.entries(schema.proprieta)) {
+    if (p.default !== undefined) campi[k] = p.default;
+  }
+  const dataCampo = Object.entries(schema.proprieta).find(([, p]) => p.tipo === 'data')?.[0];
+  const file = `db/${dbId}/items/${nomeFile(campi.titolo, dataCampo ? campi[dataCampo] : null)}`;
+
+  avviso('Creo…');
+  const r = await salva({ fonte, indice: INDICE, dbId, file, schema, campi, corpo: '' });
+  if (r.esito === 'ok') {
+    avviso('Creato', 'ok');
+    location.hash = `#/el/${encodeURIComponent(file)}`;
+  } else {
+    avviso(r.messaggio, 'errore');
+  }
 }
 
 const paginaErrore = (m) => el('div', { class: 'contenitore' },
