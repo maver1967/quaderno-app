@@ -466,3 +466,185 @@ body {
   .barra-azioni { padding-bottom: 8px; justify-content: space-between; }
   .board-contenitore::after { display: none; }
 }
+
+/* ======================================================================
+   Note: albero nella sidebar
+   ====================================================================== */
+
+.sb-sezione-azione {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-right: 8px;
+}
+.sb-piu {
+  border: 0; background: none; color: var(--testo-3); cursor: pointer;
+  font-size: 16px; line-height: 1; width: 22px; height: 22px; border-radius: 4px;
+  display: grid; place-items: center; padding: 0;
+}
+.sb-piu:hover { background: var(--sfondo-hover); color: var(--testo); }
+
+.sb-cartella {
+  width: calc(100% - 12px); text-align: left; font: inherit; font-size: 14px;
+  border: 0; background: none; color: var(--testo); cursor: pointer;
+}
+.sb-freccia {
+  flex: 0 0 auto; width: 14px; font-size: 10px; color: var(--testo-3);
+  text-align: center;
+}
+
+/* ======================================================================
+   Dialogo
+   ====================================================================== */
+
+.dlg-velo {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(15, 15, 15, .34);
+  display: grid; place-items: center; padding: 20px;
+  animation: dlg-entra .12s ease;
+}
+@keyframes dlg-entra { from { opacity: 0 } to { opacity: 1 } }
+
+.dlg {
+  width: min(520px, 100%);
+  background: var(--sfondo); color: var(--testo);
+  border: 1px solid var(--bordo-forte); border-radius: 12px;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, .24);
+  padding: 20px 22px 16px;
+  max-height: calc(100vh - 40px); overflow-y: auto;
+}
+.dlg-titolo { margin: 0 0 4px; font-size: 18px; font-weight: 620; letter-spacing: -.01em; }
+.dlg-descrizione { margin: 0 0 12px; color: var(--testo-2); font-size: 14px; }
+.dlg-corpo { margin-top: 14px; display: grid; gap: 12px; }
+
+.dlg-riga { display: grid; grid-template-columns: 110px 1fr; gap: 12px; align-items: start; }
+.dlg-etichetta { color: var(--testo-2); font-size: 14px; padding-top: 7px; }
+.dlg-controllo { min-width: 0; }
+
+.dlg-campo {
+  width: 100%; padding: 7px 10px; font: inherit; font-size: 14px;
+  border: 1px solid var(--bordo-forte); border-radius: 6px;
+  background: var(--sfondo); color: var(--testo);
+}
+.dlg-campo:focus { outline: 2px solid var(--accento); outline-offset: -1px; }
+.dlg-aiuto { display: block; margin-top: 5px; font-size: 12px; color: var(--testo-3); }
+
+.dlg-emoji-riga { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+.dlg-emoji { width: 54px; text-align: center; font-size: 17px; flex: 0 0 auto; }
+.dlg-emoji-scelta {
+  border: 1px solid transparent; background: none; cursor: pointer;
+  font-size: 16px; line-height: 1; padding: 5px; border-radius: 6px;
+}
+.dlg-emoji-scelta:hover { background: var(--sfondo-hover); border-color: var(--bordo); }
+
+.dlg-errore { margin: 10px 0 0; font-size: 13px; color: var(--tt-rosso); }
+:root[data-tema="scuro"] .dlg-errore { color: #f5a9a2; }
+
+.dlg-azioni { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.dlg-annulla {
+  padding: 6px 12px; font: inherit; font-size: 14px; cursor: pointer;
+  border: 1px solid var(--bordo-forte); border-radius: 6px;
+  background: var(--sfondo); color: var(--testo);
+}
+.dlg-annulla:hover { background: var(--sfondo-hover); }
+
+/* ======================================================================
+   Editor: barra di formattazione e area di scrittura
+   ====================================================================== */
+
+.fmt-barra {
+  display: flex; align-items: center; gap: 2px; flex-wrap: wrap;
+  padding: 5px; margin-bottom: 8px;
+  border: 1px solid var(--bordo); border-radius: 8px;
+  background: var(--sfondo-2);
+  position: sticky; top: 45px; z-index: 4;
+}
+.fmt-bottone {
+  min-width: 30px; height: 29px; padding: 0 7px;
+  border: 1px solid transparent; border-radius: 5px;
+  background: none; color: var(--testo); cursor: pointer;
+  font: inherit; font-size: 14px; line-height: 1;
+  display: grid; place-items: center;
+}
+.fmt-bottone:hover { background: var(--sfondo); border-color: var(--bordo); }
+.fmt-bottone:active { background: var(--sfondo-attivo); }
+.fmt-separatore {
+  width: 1px; height: 18px; margin: 0 4px; background: var(--bordo-forte);
+}
+
+.editor-testo {
+  width: 100%; min-height: 340px; resize: vertical;
+  padding: 16px 18px;
+  border: 1px solid var(--bordo-forte); border-radius: 8px;
+  background: var(--sfondo); color: var(--testo);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 14.5px; line-height: 1.75; tab-size: 2;
+}
+.editor-testo:focus { outline: 2px solid var(--accento); outline-offset: -1px; }
+/* se la pagina scorre fino all'editor, lascia spazio alla barra appiccicata */
+.editor-testo, .fmt-barra { scroll-margin-top: 104px; }
+
+/* ======================================================================
+   Note: testata e tipografia del documento
+   ====================================================================== */
+
+.testata-nota { display: flex; gap: 14px; align-items: center; margin: 24px 0 6px; }
+.testata-nota .titolo-pagina { margin: 0; flex: 1 1 auto; }
+
+.pulsante-icona {
+  cursor: pointer; font-family: inherit;
+  transition: background .12s ease, border-color .12s ease;
+}
+.pulsante-icona:hover:not(:disabled) { background: var(--sfondo-hover); border-color: var(--bordo-forte); }
+.pulsante-icona:disabled { cursor: default; }
+
+/* Testo lungo: misura di riga comoda, interlinea generosa, titoli che
+   scendono di peso invece che di sola dimensione. */
+.documento {
+  font-size: 16.5px; line-height: 1.7; max-width: 72ch;
+  letter-spacing: -.003em;
+}
+.documento > :first-child { margin-top: 0; }
+.documento h1 { font-size: 26px; font-weight: 640; margin: 30px 0 8px; letter-spacing: -.018em; }
+.documento h2 { font-size: 21px; font-weight: 620; margin: 26px 0 6px; letter-spacing: -.012em; }
+.documento h3 { font-size: 17.5px; font-weight: 620; margin: 22px 0 4px; }
+.documento p { margin: 0 0 14px; }
+.documento ul, .documento ol { margin: 0 0 14px; padding-left: 24px; }
+.documento li { margin: 4px 0; }
+.documento li::marker { color: var(--testo-3); }
+.documento blockquote {
+  margin: 16px 0; padding: 2px 0 2px 16px;
+  border-left: 3px solid var(--bordo-forte); color: var(--testo-2);
+}
+.documento code { font-size: .86em; }
+.documento pre { margin: 16px 0; line-height: 1.6; }
+.documento hr { margin: 28px 0; }
+.documento .spunta { color: var(--testo-2); font-size: 1.05em; }
+
+@media (max-width: 820px) {
+  .dlg-riga { grid-template-columns: 1fr; gap: 5px; }
+  .dlg-etichetta { padding-top: 0; }
+  .documento { font-size: 16px; }
+  .fmt-barra { top: 0; }
+  .editor-testo { padding: 13px 14px; font-size: 15px; }
+}
+
+
+/* i titoli lunghi nella sidebar finivano tagliati di netto: ora puntini */
+.sb-voce > span:not(.icona):not(.n):not(.sb-freccia) {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+
+/* azione secondaria: c'e' ma non ruba l'occhio al titolo */
+.azione-discreta {
+  flex: 0 0 auto; align-self: center;
+  padding: 5px 11px; font: inherit; font-size: 13px; cursor: pointer;
+  border: 1px solid var(--bordo-forte); border-radius: 6px;
+  background: var(--sfondo); color: var(--testo-2);
+}
+.azione-discreta:hover { background: var(--sfondo-hover); color: var(--testo); }
+
+.testata-nota { gap: 12px; }
+.testata-nota .titolo-pagina { min-width: 0; }
+@media (max-width: 820px) {
+  .testata-nota { flex-wrap: wrap; }
+  .azione-discreta { order: 3; width: 100%; }
+}

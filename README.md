@@ -16,7 +16,8 @@ personale salvato sul dispositivo. Questa repo contiene solo codice.
 | `app.js` | sidebar, rotte, viste, ricerca |
 | `fonte.js` | lettura/scrittura dei dati (file locali o API GitHub) |
 | `markdown.js` | renderer Markdown |
-| `modifica.js` | editor: controlli per tipo, composizione del file, salvataggio |
+| `modifica.js` | editor: controlli per tipo, barra di formattazione, salvataggio |
+| `dialogo.js` | finestre di dialogo (nuova nota, nuovo elemento, icona) |
 | `sw.js` | service worker: guscio installabile e apribile senza rete |
 | `manifest.webmanifest` | metadati dell'app installabile |
 
@@ -33,6 +34,17 @@ patch: il file è la verità, l'indice è una cache.
 Ogni file porta lo `sha` dell'ultima lettura. Se nel frattempo è cambiato
 (altro dispositivo, Action), GitHub rifiuta la scrittura e l'app avvisa invece
 di sovrascrivere in silenzio.
+
+## Note
+
+Le note stanno in `note/`, e **le sottocartelle sono l'alberatura della
+sidebar**: le cartelle si aprono e chiudono, e quali sono chiuse resta sul
+dispositivo. Creando una nota si sceglie titolo, cartella (anche nuova, anche
+annidata con `cartella/sottocartella`) e icona.
+
+L'editor ha una barra di formattazione — grassetto, corsivo, codice, titolo,
+elenco, caselle da spuntare, citazione, collegamento — con ⌘B e ⌘I. Agisce
+sulla selezione: la avvolge, e se è già avvolta la sveste.
 
 ## Viste
 

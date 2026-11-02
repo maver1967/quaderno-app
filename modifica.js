@@ -116,12 +116,22 @@ export async function salva({ fonte, indice, dbId, file, schema, campi, corpo })
     await fonte.salva(file, testo);
 
     // aggiornamento ottimistico: l'indice vero arrivera' dalla Action fra ~30s
-    const db = indice.database[dbId];
-    if (db) {
-      const i = db.elementi.findIndex((e) => e._file === file);
-      const nuovo = { ...campi, _file: file, _corpo: !!(corpo || '').trim() };
-      if (i >= 0) db.elementi[i] = { ...db.elementi[i], ...nuovo };
-      else db.elementi.push(nuovo);
+    const nuovo = { ...campi, _file: file, _corpo: !!(corpo || '').trim() };
+    if (dbId) {
+      const db = indice.database[dbId];
+      if (db) {
+        const i = db.elementi.findIndex((e) => e._file === file);
+        if (i >= 0) db.elementi[i] = { ...db.elementi[i], ...nuovo };
+        else db.elementi.push(nuovo);
+      }
+    } else {
+      // nota: il percorso nella sidebar viene dalle cartelle del file
+      const parti = file.replace(/^note\//, '').split('/');
+      nuovo._percorso = parti.slice(0, -1);
+      const i = indice.note.findIndex((e) => e._file === file);
+      if (i >= 0) indice.note[i] = { ...indice.note[i], ...nuovo };
+      else indice.note.push(nuovo);
+      indice.note.sort((a, b) => a._file.localeCompare(b._file, 'it'));
     }
     return { esito: 'ok' };
   } catch (e) {
@@ -164,4 +174,110 @@ export function nomeFile(titolo, data) {
     .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase()
     .replace(/-{2,}/g, '-').slice(0, 60).replace(/-$/, '') || 'senza-titolo';
   return (data ? `${data}-${s}` : s) + '.md';
+}
+
+/* ======================================================================
+   Barra di formattazione per l'editor Markdown.
+   Agisce sulla selezione: se c'e' testo selezionato lo avvolge, altrimenti
+   inserisce i segni e mette il cursore dentro.
+   ====================================================================== */
+
+/** Avvolge la selezione fra `prima` e `dopo`; se gia' avvolta, la sveste. */
+function avvolgi(ta, prima, dopo = prima) {
+  const { selectionStart: a, selectionEnd: b, value: v } = ta;
+  const dentro = v.slice(a, b);
+  const giaFuori = v.slice(a - prima.length, a) === prima && v.slice(b, b + dopo.length) === dopo;
+
+  if (giaFuori) {
+    ta.value = v.slice(0, a - prima.length) + dentro + v.slice(b + dopo.length);
+    ta.setSelectionRange(a - prima.length, b - prima.length);
+  } else {
+    ta.value = v.slice(0, a) + prima + dentro + dopo + v.slice(b);
+    ta.setSelectionRange(a + prima.length, b + prima.length);
+  }
+  ta.focus();
+}
+
+/** Mette (o toglie) un prefisso a ogni riga della selezione. */
+function prefissa(ta, prefisso) {
+  const { selectionStart: a, selectionEnd: b, value: v } = ta;
+  const inizio = v.lastIndexOf('\n', a - 1) + 1;
+  const fine = v.indexOf('\n', b) === -1 ? v.length : v.indexOf('\n', b);
+  const righe = v.slice(inizio, fine).split('\n');
+  const tutte = righe.every((r) => r.startsWith(prefisso));
+  const nuove = righe.map((r) => (tutte ? r.slice(prefisso.length) : prefisso + r));
+  ta.value = v.slice(0, inizio) + nuove.join('\n') + v.slice(fine);
+  ta.setSelectionRange(inizio, inizio + nuove.join('\n').length);
+  ta.focus();
+}
+
+const AZIONI = [
+  { id: 'grassetto', etichetta: 'B',  titolo: 'Grassetto  ⌘B', stile: 'font-weight:700',
+    fai: (ta) => avvolgi(ta, '**') },
+  { id: 'corsivo',   etichetta: 'I',  titolo: 'Corsivo  ⌘I', stile: 'font-style:italic',
+    fai: (ta) => avvolgi(ta, '*') },
+  { id: 'codice',    etichetta: '< >', titolo: 'Codice',
+    fai: (ta) => avvolgi(ta, '`') },
+  { separatore: true },
+  { id: 'titolo',    etichetta: 'H',  titolo: 'Titolo', stile: 'font-weight:650',
+    fai: (ta) => prefissa(ta, '## ') },
+  { id: 'elenco',    etichetta: '•',  titolo: 'Elenco puntato',
+    fai: (ta) => prefissa(ta, '- ') },
+  { id: 'caselle',   etichetta: '☐',  titolo: 'Casella da spuntare',
+    fai: (ta) => prefissa(ta, '- [ ] ') },
+  { id: 'citazione', etichetta: '❝',  titolo: 'Citazione',
+    fai: (ta) => prefissa(ta, '> ') },
+  { separatore: true },
+  { id: 'link',      etichetta: '🔗', titolo: 'Collegamento',
+    fai: (ta) => {
+      const sel = ta.value.slice(ta.selectionStart, ta.selectionEnd) || 'testo';
+      const a = ta.selectionStart;
+      ta.value = ta.value.slice(0, a) + `[${sel}](url)` + ta.value.slice(ta.selectionEnd);
+      // seleziona "url" cosi' si digita subito l'indirizzo
+      ta.setSelectionRange(a + sel.length + 3, a + sel.length + 6);
+      ta.focus();
+    } },
+];
+
+/**
+ * Costruisce la barra e lega le scorciatoie da tastiera.
+ * `dopoModifica` viene chiamato a ogni cambiamento del testo.
+ */
+export function barraFormato(ta, dopoModifica) {
+  const bottone = (a) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'fmt-bottone';
+    b.title = a.titolo;
+    b.setAttribute('aria-label', a.titolo);
+    b.textContent = a.etichetta;
+    if (a.stile) b.setAttribute('style', a.stile);
+    b.addEventListener('click', (e) => { e.preventDefault(); a.fai(ta); dopoModifica(); });
+    // mousedown preventDefault: non perde il cursore nel testo
+    b.addEventListener('mousedown', (e) => e.preventDefault());
+    return b;
+  };
+
+  const barra = document.createElement('div');
+  barra.className = 'fmt-barra';
+  barra.setAttribute('role', 'toolbar');
+  barra.setAttribute('aria-label', 'Formattazione');
+  for (const a of AZIONI) {
+    if (a.separatore) {
+      const s = document.createElement('span');
+      s.className = 'fmt-separatore';
+      barra.append(s);
+    } else {
+      barra.append(bottone(a));
+    }
+  }
+
+  ta.addEventListener('keydown', (e) => {
+    if (!(e.metaKey || e.ctrlKey)) return;
+    const k = e.key.toLowerCase();
+    if (k === 'b') { e.preventDefault(); avvolgi(ta, '**'); dopoModifica(); }
+    if (k === 'i') { e.preventDefault(); avvolgi(ta, '*');  dopoModifica(); }
+  });
+
+  return barra;
 }

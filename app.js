@@ -6,7 +6,8 @@
 
 import { creaFonte, configurazione, FonteGitHub } from './fonte.js';
 import { markdown, separaFrontmatter } from './markdown.js';
-import { controllo, salva, avviso, nuovoId, nomeFile } from './modifica.js';
+import { controllo, salva, avviso, nuovoId, nomeFile, barraFormato } from './modifica.js';
+import { dialogo } from './dialogo.js';
 
 let fonte = creaFonte();
 const $ = (s, r = document) => r.querySelector(s);
@@ -130,6 +131,64 @@ function applica(elementi, vista) {
 
 /* ---------------------------------------------------------- sidebar */
 
+/** Costruisce l'albero delle note dalle cartelle di ciascun file. */
+function alberoNote(note) {
+  const radice = { cartelle: new Map(), note: [] };
+  for (const n of note) {
+    let nodo = radice;
+    for (const parte of (n._percorso || [])) {
+      if (!nodo.cartelle.has(parte)) nodo.cartelle.set(parte, { cartelle: new Map(), note: [] });
+      nodo = nodo.cartelle.get(parte);
+    }
+    nodo.note.push(n);
+  }
+  return radice;
+}
+
+/* quali cartelle sono chiuse: comodita' di questo dispositivo, non un dato */
+const CHIAVE_CHIUSE = 'quaderno.cartelle-chiuse';
+const chiuse = new Set((() => {
+  try { return JSON.parse(localStorage.getItem(CHIAVE_CHIUSE) || '[]'); } catch { return []; }
+})());
+const ricordaChiuse = () => {
+  try { localStorage.setItem(CHIAVE_CHIUSE, JSON.stringify([...chiuse])); } catch {}
+};
+
+function disegnaAlbero(dove, nodo, rotta, livello, percorso = '') {
+  for (const [nome, figlio] of [...nodo.cartelle].sort((a, b) => a[0].localeCompare(b[0], 'it'))) {
+    const chiave = percorso + '/' + nome;
+    const aperta = !chiuse.has(chiave);
+    const conta = (function n(x) {
+      return x.note.length + [...x.cartelle.values()].reduce((t, y) => t + n(y), 0);
+    })(figlio);
+
+    dove.append(el('button', {
+      class: 'sb-voce sb-cartella', style: `padding-left:${8 + livello * 14}px`,
+      'aria-expanded': aperta ? 'true' : 'false',
+      onclick: () => {
+        aperta ? chiuse.add(chiave) : chiuse.delete(chiave);
+        ricordaChiuse();
+        disegnaSidebar(rotta);
+      },
+    },
+      el('span', { class: 'sb-freccia', 'aria-hidden': 'true', testo: aperta ? '▾' : '▸' }),
+      el('span', { testo: nome }),
+      el('span', { class: 'n', testo: conta })));
+
+    if (aperta) disegnaAlbero(dove, figlio, rotta, livello + 1, chiave);
+  }
+
+  for (const n of nodo.note) {
+    dove.append(el('a', {
+      class: 'sb-voce', style: `padding-left:${(livello ? 8 + livello * 14 + 14 : 8)}px`,
+      href: `#/nota/${encodeURIComponent(n._file)}`,
+      'aria-current': rotta.tipo === 'nota' && rotta.file === n._file ? 'page' : null,
+    },
+      el('span', { class: 'icona', testo: n.icona || '📄' }),
+      el('span', { testo: n.titolo })));
+  }
+}
+
 function disegnaSidebar(rotta) {
   const sb = $('#sidebar');
   sb.replaceChildren();
@@ -157,18 +216,13 @@ function disegnaSidebar(rotta) {
       el('span', { class: 'n', testo: db.elementi.length })));
   }
 
-  if (INDICE.note.length) {
-    sb.append(el('div', { class: 'sb-sezione', testo: 'Note' }));
-    for (const n of INDICE.note) {
-      sb.append(el('a', {
-        class: `sb-voce${n._percorso?.length ? ' annidata' : ''}`,
-        href: `#/nota/${encodeURIComponent(n._file)}`,
-        'aria-current': rotta.tipo === 'nota' && rotta.file === n._file ? 'page' : null,
-      },
-        el('span', { class: 'icona', testo: n.icona || '📄' }),
-        el('span', { testo: n.titolo })));
-    }
-  }
+  sb.append(el('div', { class: 'sb-sezione sb-sezione-azione' },
+    el('span', { testo: 'Note' }),
+    fonte.scrivibile
+      ? el('button', { class: 'sb-piu', title: 'Nuova nota', 'aria-label': 'Nuova nota',
+                       onclick: creaNota, testo: '+' })
+      : null));
+  disegnaAlbero(sb, alberoNote(INDICE.note), rotta, 0);
 
   // sempre in fondo: lo spaziatore spinge la voce al piede della sidebar
   sb.append(el('div', { style: 'margin-top:auto' }));
@@ -391,6 +445,15 @@ async function paginaElemento(file) {
           : cella(prop, bozza[k], k))));
 
   // --- titolo
+  const cambiaIcona = async () => {
+    const v = await dialogo({
+      titolo: 'Icona', campi: [{ nome: 'icona', etichetta: 'Icona', tipo: 'emoji',
+                                 valore: bozza.icona || '📄' }],
+      conferma: 'Usa questa',
+    });
+    if (v) { bozza.icona = v.icona || null; segnaSporco(); disegnaRotta(leggiRotta()); }
+  };
+
   const titolo = fonte.scrivibile
     ? el('input', {
         class: 'titolo-pagina', value: bozza.titolo || '',
@@ -405,46 +468,52 @@ async function paginaElemento(file) {
   const zonaCorpo = el('div', {}, vistaCorpo);
 
   const apriEditor = () => {
-    const ta = el('textarea', {
-      class: 'sb-cerca',
-      style: 'width:100%;min-height:320px;font:inherit;line-height:1.6;resize:vertical;padding:12px',
-      'aria-label': 'Testo della nota',
-    });
+    const ta = el('textarea', { class: 'editor-testo', 'aria-label': 'Testo' });
     ta.value = corpo;
-    ta.addEventListener('input', () => { corpo = ta.value; segnaSporco(); });
+    const aggiorna = () => { corpo = ta.value; segnaSporco(); };
+    ta.addEventListener('input', aggiorna);
+
     zonaCorpo.replaceChildren(
-      el('div', { class: 'muto', style: 'font-size:13px;margin-bottom:6px',
-                  testo: 'Markdown: **grassetto**, # titolo, - elenco, - [ ] casella' }),
+      barraFormato(ta, aggiorna),
       ta,
       el('div', { style: 'margin-top:8px' },
         bottone('Anteprima', () => {
           vistaCorpo.innerHTML = markdown(corpo);
-          zonaCorpo.replaceChildren(vistaCorpo, el('div', { style: 'margin-top:8px' },
+          zonaCorpo.replaceChildren(vistaCorpo, el('div', { style: 'margin-top:10px' },
             bottone('Modifica il testo', apriEditor)));
         })));
-    ta.focus();
+    // preventScroll: senza, il fuoco fa scorrere la pagina e la barra
+    // appiccicata finisce a coprire le prime righe del testo
+    ta.focus({ preventScroll: true });
+    ta.setSelectionRange(0, 0);
+    ta.scrollTop = 0;
   };
 
+  const azioneTesto = fonte.scrivibile
+    ? el('button', { class: 'azione-discreta', onclick: apriEditor, testo: 'Modifica il testo' })
+    : null;
+
+  const intestazione = (bozza.icona || righe.length === 0)
+    ? el('div', { class: 'testata-nota' },
+        el('button', { class: 'piastrella-icona pulsante-icona', title: 'Cambia icona',
+                       onclick: fonte.scrivibile ? cambiaIcona : null,
+                       disabled: !fonte.scrivibile, testo: bozza.icona || '📄' }),
+        titolo, azioneTesto)
+    : el('div', { class: 'testata-nota' }, titolo, azioneTesto);
+
   return el('div', { class: 'contenitore' },
-    titolo,
+    intestazione,
     righe.length ? el('div', { class: 'proprieta' }, righe) : null,
-    fonte.scrivibile
-      ? el('div', { style: 'margin:10px 0' }, bottone('Modifica il testo', apriEditor))
+    fonte.scrivibile ? null
       : el('div', { class: 'muto', style: 'margin:10px 0;font-size:13px',
                     testo: 'Sola lettura: collega GitHub nelle Impostazioni per modificare.' }),
     zonaCorpo,
     barra);
 }
 
-async function paginaNota(file) {
-  const testo = await fonte.file(file);
-  const [campi, corpo] = separaFrontmatter(testo);
-  return el('div', { class: 'contenitore' },
-    el('h1', { class: 'titolo-pagina' },
-      el('span', { class: 'icona', testo: campi.icona || '📄' }),
-      campi.titolo || '(senza titolo)'),
-    el('div', { class: 'documento', html: markdown(corpo) }));
-}
+/* Le note usano la stessa pagina degli elementi: stesso editor, stesse
+   regole di salvataggio. Cambia solo che non hanno proprieta' di schema. */
+const paginaNota = (file) => paginaElemento(file);
 
 function paginaCerca(q) {
   const termini = q.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').split(/\s+/).filter(Boolean);
@@ -533,14 +602,64 @@ function paginaImpostazioni() {
     esito);
 }
 
+/** Elenco delle cartelle gia' esistenti sotto note/. */
+function cartelleEsistenti() {
+  const viste = new Set();
+  for (const n of INDICE.note) {
+    const parti = n._percorso || [];
+    for (let i = 0; i < parti.length; i++) viste.add(parti.slice(0, i + 1).join('/'));
+  }
+  return [...viste].sort((a, b) => a.localeCompare(b, 'it'));
+}
+
+/** Crea una nota: titolo, cartella (anche nuova, anche annidata) e icona. */
+async function creaNota() {
+  const valori = await dialogo({
+    titolo: 'Nuova nota',
+    campi: [
+      { nome: 'titolo', etichetta: 'Titolo', tipo: 'testo', obbligatorio: true,
+        segnaposto: 'Di cosa parla' },
+      { nome: 'cartella', etichetta: 'Cartella', tipo: 'select-o-nuovo', valore: '',
+        opzioni: [{ valore: '', etichetta: '— nessuna (in cima) —' },
+                  ...cartelleEsistenti().map((c) => ({ valore: c, etichetta: c }))],
+        aiuto: 'Per annidare più livelli: cartella/sottocartella' },
+      { nome: 'icona', etichetta: 'Icona', tipo: 'emoji', valore: '📄' },
+    ],
+    conferma: 'Crea la nota',
+  });
+  if (!valori) return;
+
+  const cartella = (valori.cartella || '').replace(/^\/+|\/+$/g, '');
+  const campi = { titolo: valori.titolo.trim(), icona: valori.icona || '📄',
+                  creato: new Date().toISOString().slice(0, 19) + 'Z' };
+  const file = `note/${cartella ? cartella + '/' : ''}${nomeFile(campi.titolo, null)}`;
+
+  if (INDICE.note.some((n) => n._file === file)) {
+    avviso('Esiste già una nota con questo titolo in questa cartella.', 'errore');
+    return;
+  }
+
+  avviso('Creo…');
+  const r = await salva({ fonte, indice: INDICE, dbId: null, file, schema: null, campi, corpo: '' });
+  if (r.esito === 'ok') {
+    avviso('Nota creata', 'ok');
+    location.hash = `#/nota/${encodeURIComponent(file)}`;
+  } else {
+    avviso(r.messaggio, 'errore');
+  }
+}
+
 /** Crea un elemento vuoto nel database e lo apre. */
 async function creaElemento(dbId) {
   const db = INDICE.database[dbId];
   const schema = db.schema;
-  const titolo = prompt(`Titolo del nuovo elemento in "${schema.nome}":`);
-  if (titolo === null || !titolo.trim()) return;
+  const valori = await dialogo({
+    titolo: `Nuovo in ${schema.nome}`,
+    campi: [{ nome: 'titolo', etichetta: 'Titolo', tipo: 'testo', obbligatorio: true }],
+  });
+  if (!valori) return;
 
-  const campi = { id: nuovoId(dbId.slice(0, 3)), titolo: titolo.trim() };
+  const campi = { id: nuovoId(dbId.slice(0, 3)), titolo: valori.titolo.trim() };
   for (const [k, p] of Object.entries(schema.proprieta)) {
     if (p.default !== undefined) campi[k] = p.default;
   }
