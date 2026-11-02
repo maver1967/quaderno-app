@@ -17,6 +17,8 @@ personale salvato sul dispositivo. Questa repo contiene solo codice.
 | `fonte.js` | lettura/scrittura dei dati (file locali o API GitHub) |
 | `markdown.js` | renderer Markdown |
 | `modifica.js` | editor: controlli per tipo, composizione del file, salvataggio |
+| `sw.js` | service worker: guscio installabile e apribile senza rete |
+| `manifest.webmanifest` | metadati dell'app installabile |
 
 L'app è generica: non sa cosa sia un "task". Legge gli `_schema.json` della
 repo dei dati e si disegna di conseguenza. Per aggiungere un database basta
@@ -36,6 +38,19 @@ di sovrascrivere in silenzio.
 
 Tabella, lista, board raggruppata, calendario. Con filtri, ordinamenti e
 ricerca. Su telefono le tabelle diventano liste di schede.
+
+## Installazione sul telefono
+
+L'app è una PWA. Da Safari o Chrome sul telefono, "Aggiungi a schermata Home":
+compare come un'app, a tutto schermo, con la sua icona.
+
+Il service worker mette in cache **solo il guscio** (HTML, CSS, JS, icone), mai
+le chiamate a `api.github.com`: servire dati da una cache significherebbe
+mostrare roba vecchia o salvare partendo da uno `sha` scaduto. Il guscio usa
+"prima la rete, poi la cache", così gli aggiornamenti arrivano subito e l'app
+si apre comunque quando la rete manca.
+
+Senza rete si può leggere, non salvare.
 
 ## Anteprima in locale
 
