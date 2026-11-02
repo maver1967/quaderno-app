@@ -16,7 +16,7 @@
   --bordo-forte:   #dcdcd9;
   --accento:       #2383e2;
   --larghezza-sidebar: 248px;
-  --larghezza-testo:   900px;
+  --larghezza-testo:   1180px;
   --raggio: 4px;
   --ombra-bordo: rgba(15, 15, 15, .10);
 
@@ -91,9 +91,12 @@ body {
 
 .contenitore {
   max-width: var(--larghezza-testo);
-  margin: 0 auto;
+  margin: 0;                      /* allineato a sinistra, come la briciola */
   padding: 0 16px 120px;
 }
+
+/* il testo lungo resta leggibile: si limita la riga, non il contenitore */
+.documento { max-width: 74ch; }
 
 /* ---------------------------------------------------------- sidebar */
 
@@ -157,7 +160,7 @@ body {
 
 #apri-sidebar { display: none; }
 
-.testata-db { display: flex; gap: 16px; align-items: flex-start; margin: 32px 0 20px; }
+.testata-db { display: flex; gap: 14px; align-items: flex-start; margin: 26px 0 18px; }
 
 /* l'icona in una piastrella morbida: da' peso al titolo senza ingrandirlo */
 .piastrella-icona {
@@ -175,6 +178,16 @@ body {
 .titolo-pagina .icona { font-size: 30px; }
 .sottotitolo { color: var(--testo-2); margin: 0; max-width: 62ch; }
 .testata-db + .barra-viste { margin-top: 4px; }
+
+/* nelle pagine di un elemento o di una nota il titolo non ha la piastrella,
+   quindi si prende da solo l'aria che nella testata dava il margine */
+.contenitore > .titolo-pagina,
+.contenitore > input.titolo-pagina { margin-top: 24px; }
+
+.briciola-foglia {
+  color: var(--testo); max-width: 44ch;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* ------------------------------------------------------------- viste */
 
@@ -353,7 +366,10 @@ body {
 /* proprieta' in testa a un elemento */
 .proprieta { margin: 6px 0 22px; }
 .prop-riga { display: flex; gap: 10px; align-items: flex-start; padding: 4px 0; font-size: 14px; }
-.prop-nome { flex: 0 0 150px; color: var(--testo-2); display: flex; align-items: center; gap: 6px; }
+.prop-nome {
+  flex: 0 0 150px; color: var(--testo-2);
+  display: flex; align-items: center; gap: 6px;
+}
 
 /* ------------------------------------------------------------ mobile */
 

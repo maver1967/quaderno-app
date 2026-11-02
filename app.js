@@ -588,8 +588,20 @@ function briciole(rotta) {
            el('a', { href: `#/db/${rotta.db}`, testo: INDICE.database[rotta.db]?.schema.nome || rotta.db }));
   }
   if (rotta.tipo === 'el' || rotta.tipo === 'nota') {
-    const nome = rotta.file.split('/').pop().replace(/\.md$/, '');
-    b.push(el('span', { testo: '/' }), el('span', { testo: nome }));
+    // il titolo vero, non il nome del file: "Parecer Ordem Engenheiros"
+    // invece di "2026-11-18-parecer-ordem-engenheiros"
+    let nome = null, dbId = null;
+    for (const [id, d] of Object.entries(INDICE.database)) {
+      const e = d.elementi.find((x) => x._file === rotta.file);
+      if (e) { nome = e.titolo; dbId = id; break; }
+    }
+    if (!nome) nome = INDICE.note.find((n) => n._file === rotta.file)?.titolo;
+    if (!nome) nome = rotta.file.split('/').pop().replace(/\.md$/, '');
+    if (dbId) {
+      b.push(el('span', { testo: '/' }),
+             el('a', { href: `#/db/${dbId}`, testo: INDICE.database[dbId].schema.nome }));
+    }
+    b.push(el('span', { testo: '/' }), el('span', { class: 'briciola-foglia', testo: nome }));
   }
   return b;
 }
