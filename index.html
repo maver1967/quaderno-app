@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="it" data-tema="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Quaderno</title>
+<link rel="stylesheet" href="stile.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📒</text></svg>">
+</head>
+<body>
+<div id="app">
+  <nav id="sidebar" aria-label="Navigazione"></nav>
+  <div id="velo"></div>
+  <main id="principale">
+    <div class="briciole" id="briciole">
+      <button id="apri-sidebar" aria-label="Apri il menu">☰</button>
+      <div id="briciole-voci" style="display:flex;align-items:center;gap:6px"></div>
+    </div>
+    <div id="contenuto"></div>
+  </main>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
