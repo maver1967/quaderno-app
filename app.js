@@ -66,8 +66,7 @@ function cella(prop, valore, chiave) {
   switch (prop?.tipo) {
     case 'status':
       return el('span', { class: `tag ${coloreOpzione(prop, valore)}` },
-        el('span', { class: 'pallino', style: 'margin-right:5px;background:currentColor;opacity:.55' }),
-        valore);
+        el('span', { class: 'pallino' }), valore);
     case 'select':
       return el('span', { class: `tag ${coloreOpzione(prop, valore)}`, testo: valore });
     case 'multiselect':
@@ -221,7 +220,8 @@ function disegnaBoard(vista, elementi, schema) {
     gruppi.get(k).push(e);
   }
   const secondarie = (vista.colonne || []).slice(1);
-  return el('div', { class: 'board' }, [...gruppi].map(([k, lista]) =>
+  return el('div', { class: 'board-contenitore' },
+    el('div', { class: 'board' }, [...gruppi].map(([k, lista]) =>
     el('div', { class: 'colonna-board' },
       el('div', { class: 'testata-colonna' },
         k === '—' ? el('span', { class: 'tag', testo: 'Senza' })
@@ -229,9 +229,9 @@ function disegnaBoard(vista, elementi, schema) {
         el('span', { class: 'muto', testo: lista.length })),
       lista.map((e) => el('div', { class: 'scheda', onclick: () => apri(e) },
         el('div', { class: 't', testo: e.titolo || '(senza titolo)' }),
-        el('div', { style: 'display:flex;gap:7px;align-items:center;flex-wrap:wrap' },
+        el('div', { class: 'scheda-meta' },
           secondarie.filter((c) => !vuoto(e[c]))
-                    .map((c) => cella(schema.proprieta[c], e[c], c))))))));
+                    .map((c) => cella(schema.proprieta[c], e[c], c)))))))));
 }
 
 function disegnaCalendario(vista, elementi, schema, stato) {
@@ -299,26 +299,28 @@ function paginaDatabase(rotta) {
   const vista = schema.viste.find((v) => v.id === rotta.vista) || schema.viste[0];
   const elementi = applica(db.elementi, vista);
 
-  const barra = el('div', { class: 'barra-viste', role: 'tablist' },
-    schema.viste.map((v) => el('button', {
-      class: 'scheda-vista', role: 'tab',
-      'aria-selected': v.id === vista.id ? 'true' : 'false',
-      onclick: () => { location.hash = `#/db/${rotta.db}/${v.id}`; },
-      testo: v.nome,
-    })),
-    el('span', { class: 'conteggio', testo: `${elementi.length} di ${db.elementi.length}` }));
-
-  const nuovo = fonte.scrivibile ? el('button', {
-    class: 'scheda-vista',
-    style: 'border:1px solid var(--bordo-forte);border-radius:4px;padding:6px 13px;margin:12px 0 0',
-    onclick: () => creaElemento(rotta.db), testo: '+ Nuovo',
-  }) : null;
+  const barra = el('div', { class: 'barra-viste' },
+    el('div', { class: 'viste-schede', role: 'tablist' },
+      schema.viste.map((v) => el('button', {
+        class: 'scheda-vista', role: 'tab',
+        'aria-selected': v.id === vista.id ? 'true' : 'false',
+        onclick: () => { location.hash = `#/db/${rotta.db}/${v.id}`; },
+        testo: v.nome,
+      }))),
+    el('div', { class: 'barra-azioni' },
+      el('span', { class: 'conteggio', testo: elementi.length === db.elementi.length
+        ? `${elementi.length}` : `${elementi.length} di ${db.elementi.length}` }),
+      fonte.scrivibile
+        ? el('button', { class: 'azione-primaria', onclick: () => creaElemento(rotta.db) },
+            el('span', { 'aria-hidden': 'true', testo: '+' }), 'Nuovo')
+        : null));
 
   return el('div', { class: 'contenitore' },
-    el('h1', { class: 'titolo-pagina' },
-      el('span', { class: 'icona', testo: schema.icona || '▦' }), schema.nome),
-    schema.descrizione ? el('p', { class: 'sottotitolo', testo: schema.descrizione }) : null,
-    nuovo,
+    el('header', { class: 'testata-db' },
+      el('span', { class: 'piastrella-icona', 'aria-hidden': 'true', testo: schema.icona || '▦' }),
+      el('div', {},
+        el('h1', { class: 'titolo-pagina', testo: schema.nome }),
+        schema.descrizione ? el('p', { class: 'sottotitolo', testo: schema.descrizione }) : null)),
     barra,
     elementi.length
       ? disegnaVista(vista, elementi, schema)

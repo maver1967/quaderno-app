@@ -18,6 +18,7 @@
   --larghezza-sidebar: 248px;
   --larghezza-testo:   900px;
   --raggio: 4px;
+  --ombra-bordo: rgba(15, 15, 15, .10);
 
   /* tag e select: stessi colori di Notion, in chiaro */
   --t-grigio:#e3e2e0; --t-marrone:#eee0da; --t-arancione:#fadec9;
@@ -35,7 +36,7 @@
     --sfondo:#191919; --sfondo-2:#202020; --sfondo-hover:#2c2c2c;
     --sfondo-attivo:#343434; --testo:#d4d4d4; --testo-2:#9b9b9b;
     --testo-3:#6f6f6f; --bordo:#2e2e2e; --bordo-forte:#3a3a3a;
-    --accento:#529cca;
+    --accento:#529cca; --ombra-bordo: rgba(0, 0, 0, .40);
     --t-grigio:#454b4e; --t-marrone:#5c3b23; --t-arancione:#5c3b23;
     --t-giallo:#56452f; --t-verde:#2c3b35; --t-blu:#28456c;
     --t-viola:#492f64; --t-rosa:#69314c; --t-rosso:#6e3630;
@@ -50,7 +51,7 @@
   --sfondo:#191919; --sfondo-2:#202020; --sfondo-hover:#2c2c2c;
   --sfondo-attivo:#343434; --testo:#d4d4d4; --testo-2:#9b9b9b;
   --testo-3:#6f6f6f; --bordo:#2e2e2e; --bordo-forte:#3a3a3a;
-  --accento:#529cca;
+  --accento:#529cca; --ombra-bordo: rgba(0, 0, 0, .40);
   --t-grigio:#454b4e; --t-marrone:#5c3b23; --t-arancione:#5c3b23;
   --t-giallo:#56452f; --t-verde:#2c3b35; --t-blu:#28456c;
   --t-viola:#492f64; --t-rosa:#69314c; --t-rosso:#6e3630; --t-neutro:#373737;
@@ -98,8 +99,8 @@ body {
 
 .sb-testata {
   display: flex; align-items: center; gap: 8px;
-  padding: 4px 12px 12px; color: var(--testo-2);
-  font-size: 14px; font-weight: 600;
+  padding: 6px 14px 14px; color: var(--testo);
+  font-size: 15px; font-weight: 600; letter-spacing: -.01em;
 }
 
 .sb-sezione {
@@ -116,8 +117,18 @@ body {
   font-size: 14px; cursor: pointer;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.sb-voce { position: relative; transition: background .1s ease; }
 .sb-voce:hover { background: var(--sfondo-hover); }
-.sb-voce[aria-current="page"] { background: var(--sfondo-attivo); font-weight: 500; }
+.sb-voce[aria-current="page"] { background: var(--sfondo-attivo); font-weight: 520; }
+/* barretta a sinistra sulla voce attiva: si capisce dove sei anche di sfuggita */
+.sb-voce[aria-current="page"]::before {
+  content: ''; position: absolute; left: -6px; top: 6px; bottom: 6px;
+  width: 3px; border-radius: 0 3px 3px 0; background: var(--testo-2);
+}
+.sb-voce .n {
+  font-variant-numeric: tabular-nums; padding: 1px 6px;
+  border-radius: 999px; background: rgba(128,128,128,.13);
+}
 .sb-voce .icona { flex: 0 0 auto; width: 18px; text-align: center; }
 .sb-voce .n { margin-left: auto; color: var(--testo-3); font-size: 12px; }
 .sb-voce.annidata { padding-left: 26px; }
@@ -146,38 +157,75 @@ body {
 
 #apri-sidebar { display: none; }
 
+.testata-db { display: flex; gap: 16px; align-items: flex-start; margin: 32px 0 20px; }
+
+/* l'icona in una piastrella morbida: da' peso al titolo senza ingrandirlo */
+.piastrella-icona {
+  flex: 0 0 auto;
+  width: 54px; height: 54px; border-radius: 13px;
+  display: grid; place-items: center; font-size: 28px; line-height: 1;
+  background: var(--sfondo-2); border: 1px solid var(--bordo);
+}
+
 .titolo-pagina {
   display: flex; align-items: center; gap: 12px;
-  font-size: 40px; font-weight: 700; letter-spacing: -0.02em;
-  margin: 24px 0 2px; line-height: 1.15; word-break: break-word;
+  font-size: 34px; font-weight: 680; letter-spacing: -0.021em;
+  margin: 4px 0 2px; line-height: 1.18; word-break: break-word;
 }
-.titolo-pagina .icona { font-size: 38px; }
-.sottotitolo { color: var(--testo-2); margin: 0 0 18px; }
+.titolo-pagina .icona { font-size: 30px; }
+.sottotitolo { color: var(--testo-2); margin: 0; max-width: 62ch; }
+.testata-db + .barra-viste { margin-top: 4px; }
 
 /* ------------------------------------------------------------- viste */
 
 .barra-viste {
-  display: flex; gap: 2px; align-items: center;
+  display: flex; align-items: flex-end; gap: 14px;
   border-bottom: 1px solid var(--bordo);
-  margin: 10px 0 2px; overflow-x: auto;
+  margin: 14px 0 2px;
 }
+.viste-schede { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; }
+.viste-schede::-webkit-scrollbar { display: none; }
+
 .scheda-vista {
-  padding: 6px 9px; font-size: 14px; color: var(--testo-2);
+  padding: 7px 10px; font-size: 14px; color: var(--testo-2);
   background: none; border: 0; border-bottom: 2px solid transparent;
   cursor: pointer; white-space: nowrap; font: inherit;
+  border-radius: 4px 4px 0 0;
 }
-.scheda-vista:hover { color: var(--testo); }
-.scheda-vista[aria-selected="true"] { color: var(--testo); border-bottom-color: var(--testo); font-weight: 500; }
-.conteggio { margin-left: auto; color: var(--testo-3); font-size: 13px; padding-right: 4px; }
+.scheda-vista:hover { color: var(--testo); background: var(--sfondo-hover); }
+.scheda-vista[aria-selected="true"] {
+  color: var(--testo); border-bottom-color: var(--testo); font-weight: 530; background: none;
+}
+
+.barra-azioni { display: flex; align-items: center; gap: 10px; padding-bottom: 5px; flex: 0 0 auto; }
+.conteggio {
+  color: var(--testo-3); font-size: 12px; font-variant-numeric: tabular-nums;
+  padding: 2px 8px; border-radius: 999px; background: var(--sfondo-2);
+}
+
+/* unico bottone "pieno" dell'interfaccia: cosi' l'azione principale si vede */
+.azione-primaria {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 12px; font: inherit; font-size: 14px; font-weight: 500;
+  border: 1px solid var(--testo); border-radius: 6px;
+  background: var(--testo); color: var(--sfondo);
+  cursor: pointer; white-space: nowrap;
+}
+.azione-primaria:hover { opacity: .86; }
+.azione-primaria span { font-size: 16px; line-height: 1; }
 
 /* tabella */
 .tabella { width: 100%; border-collapse: collapse; font-size: 14px; }
 .tabella th {
-  text-align: left; font-weight: 400; color: var(--testo-2); font-size: 13px;
-  padding: 7px 8px; border-bottom: 1px solid var(--bordo);
+  text-align: left; font-weight: 500; color: var(--testo-3); font-size: 12px;
+  letter-spacing: .02em; text-transform: uppercase;
+  padding: 9px 10px; border-bottom: 1px solid var(--bordo);
   position: sticky; top: 45px; background: var(--sfondo); z-index: 2;
 }
-.tabella td { padding: 7px 8px; border-bottom: 1px solid var(--bordo); vertical-align: top; }
+.tabella td {
+  padding: 9px 10px; border-bottom: 1px solid var(--bordo); vertical-align: top;
+  font-variant-numeric: tabular-nums;
+}
 .tabella tbody tr:hover { background: var(--sfondo-hover); }
 .tabella .cella-titolo { font-weight: 500; cursor: pointer; }
 .tabella .cella-titolo:hover { text-decoration: underline; }
@@ -186,34 +234,66 @@ body {
 .lista { margin: 4px 0; }
 .riga-lista {
   display: flex; align-items: center; gap: 10px;
-  padding: 8px 8px; border-bottom: 1px solid var(--bordo); cursor: pointer;
+  padding: 10px 10px; border-bottom: 1px solid var(--bordo); cursor: pointer;
+  border-radius: 5px;
 }
 .riga-lista:hover { background: var(--sfondo-hover); }
 .riga-lista .t { font-weight: 500; flex: 1 1 auto; }
 
 /* board */
-.board { display: flex; gap: 12px; overflow-x: auto; padding: 12px 0 4px; align-items: flex-start; }
-.colonna-board { flex: 0 0 260px; }
+/* L'ombra a destra dice "c'e' altro, scorri": senza, le colonne sembravano
+   semplicemente tagliate. Una sfumatura verso il colore di sfondo non
+   funzionava: su fondo quasi bianco era invisibile. Un'ombra si vede in
+   entrambi i temi. */
+.board-contenitore { position: relative; }
+.board-contenitore::after {
+  content: ''; position: absolute; top: 14px; right: -16px; bottom: 10px; width: 30px;
+  pointer-events: none; z-index: 3;
+  background: linear-gradient(to right, transparent, var(--ombra-bordo));
+}
+
+.board {
+  display: flex; gap: 10px; overflow-x: auto; padding: 14px 0 10px;
+  align-items: flex-start; scroll-snap-type: x proximity;
+}
+.colonna-board {
+  flex: 0 0 272px; scroll-snap-align: start;
+  background: var(--sfondo-2); border-radius: 10px; padding: 8px;
+  min-height: 108px;
+}
 .testata-colonna {
   display: flex; align-items: center; gap: 8px;
-  padding: 4px 2px 8px; font-size: 13px; color: var(--testo-2);
+  padding: 3px 4px 9px; font-size: 13px; color: var(--testo-2);
+  position: sticky; top: 0;
 }
+.testata-colonna .muto { font-variant-numeric: tabular-nums; }
+
 .scheda {
   background: var(--sfondo); border: 1px solid var(--bordo);
-  border-radius: 6px; padding: 9px 10px; margin-bottom: 7px; cursor: pointer;
-  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+  border-radius: 7px; padding: 10px 11px; margin-bottom: 6px; cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,.05);
+  transition: box-shadow .12s ease, transform .12s ease;
 }
-.scheda:hover { background: var(--sfondo-hover); }
-.scheda .t { font-weight: 500; font-size: 14px; margin-bottom: 5px; }
+.scheda:hover { box-shadow: 0 2px 7px rgba(0,0,0,.09); transform: translateY(-1px); }
+.scheda .t { font-weight: 520; font-size: 14px; line-height: 1.35; margin-bottom: 7px; }
+.scheda-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12px; }
+.scheda-meta > span:not(.tag) { color: var(--testo-3); font-variant-numeric: tabular-nums; }
 
 /* calendario */
 .calendario { margin-top: 12px; }
 .cal-testata { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.cal-griglia { display: grid; grid-template-columns: repeat(7, 1fr); border-top: 1px solid var(--bordo); border-left: 1px solid var(--bordo); }
+/* minmax(0, 1fr) e non 1fr: altrimenti un titolo lungo allarga la sua colonna
+   e il calendario viene storto. */
+.cal-griglia {
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-top: 1px solid var(--bordo); border-left: 1px solid var(--bordo);
+}
 .cal-gg-nome { padding: 6px; font-size: 12px; color: var(--testo-2); text-align: center;
   border-right: 1px solid var(--bordo); border-bottom: 1px solid var(--bordo); }
-.cal-cella { min-height: 92px; padding: 4px; border-right: 1px solid var(--bordo);
-  border-bottom: 1px solid var(--bordo); }
+.cal-cella {
+  min-height: 92px; padding: 4px; border-right: 1px solid var(--bordo);
+  border-bottom: 1px solid var(--bordo); min-width: 0; overflow: hidden;
+}
 .cal-cella.fuori { background: var(--sfondo-2); }
 .cal-num { font-size: 12px; color: var(--testo-2); padding: 2px 4px; }
 .cal-cella.oggi .cal-num { background: var(--accento); color: #fff; border-radius: 999px; display: inline-block; min-width: 20px; text-align: center; }
@@ -224,8 +304,8 @@ body {
 /* ---------------------------------------------------------- etichette */
 
 .tag {
-  display: inline-block; padding: 1px 8px; border-radius: 3px;
-  font-size: 12px; line-height: 18px; white-space: nowrap;
+  display: inline-block; padding: 1px 8px; border-radius: 4px;
+  font-size: 12px; line-height: 19px; white-space: nowrap; font-weight: 450;
   background: var(--t-grigio); color: var(--tt-grigio);
 }
 .tag.grigio{background:var(--t-grigio);color:var(--tt-grigio)}
@@ -239,6 +319,12 @@ body {
 .tag.rosso{background:var(--t-rosso);color:var(--tt-rosso)}
 .tag.neutro{background:var(--t-neutro);color:var(--tt-neutro)}
 
+/* il pallino prende il colore del testo del tag: ogni status ha il suo */
+.tag .pallino {
+  width: 7px; height: 7px; border-radius: 999px; display: inline-block;
+  margin-right: 6px; background: currentColor; opacity: .62;
+  vertical-align: 1px;
+}
 .pallino { width: 8px; height: 8px; border-radius: 999px; display: inline-block; background: var(--t-grigio); }
 
 .muto { color: var(--testo-3); }
@@ -309,4 +395,58 @@ body {
   .colonna-board { flex-basis: 78vw; }
   .cal-cella { min-height: 64px; }
   .prop-nome { flex-basis: 110px; }
+}
+
+
+/* ======================================================================
+   Rifiniture
+   ====================================================================== */
+
+/* focus visibile solo da tastiera: non sporca il clic col mouse */
+:focus-visible {
+  outline: 2px solid var(--accento);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+.sb-voce:focus-visible, .scheda:focus-visible { outline-offset: -2px; }
+
+/* vuoto piu' gentile */
+.vuoto {
+  padding: 56px 16px; color: var(--testo-3); text-align: center;
+  border: 1px dashed var(--bordo-forte); border-radius: 10px; margin-top: 14px;
+}
+
+/* numeri allineati ovunque compaiano conteggi o date */
+.conteggio, .cal-num, .n { font-variant-numeric: tabular-nums; }
+
+/* calendario: un po' piu' d'aria e oggi piu' evidente */
+.cal-griglia { border-radius: 8px; overflow: hidden; }
+.cal-gg-nome { font-weight: 500; letter-spacing: .02em; text-transform: uppercase; font-size: 11px; }
+.cal-ev { transition: background .1s ease; }
+.cal-ev:hover { background: var(--sfondo-attivo); }
+
+/* barra di scorrimento discreta, in tinta */
+* { scrollbar-width: thin; scrollbar-color: var(--bordo-forte) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--bordo-forte); border-radius: 999px;
+  border: 3px solid transparent; background-clip: content-box;
+}
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* chi ha chiesto meno animazioni non ne vede */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    transition-duration: .001ms !important;
+  }
+  .scheda:hover { transform: none; }
+}
+
+@media (max-width: 820px) {
+  .testata-db { gap: 12px; margin: 22px 0 16px; }
+  .piastrella-icona { width: 44px; height: 44px; border-radius: 11px; font-size: 23px; }
+  .barra-viste { flex-direction: column; align-items: stretch; gap: 8px; }
+  .barra-azioni { padding-bottom: 8px; justify-content: space-between; }
+  .board-contenitore::after { display: none; }
 }
