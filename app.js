@@ -169,7 +169,7 @@ function disegnaAlbero(dove, nodo, rotta, livello, percorso = '') {
       onclick: () => {
         aperta ? chiuse.add(chiave) : chiuse.delete(chiave);
         ricordaChiuse();
-        disegnaSidebar(rotta);
+        disegnaSidebar(rotta, true);
       },
     },
       el('span', { class: 'sb-freccia', 'aria-hidden': 'true', testo: aperta ? '▾' : '▸' }),
@@ -190,7 +190,18 @@ function disegnaAlbero(dove, nodo, rotta, livello, percorso = '') {
   }
 }
 
-function disegnaSidebar(rotta) {
+let FIRMA_SIDEBAR = null;
+
+function disegnaSidebar(rotta, forza = false) {
+  // la ricerca cambia la rotta a ogni lettera: se ridisegnassimo la sidebar
+  // la casella verrebbe distrutta e ricreata, e il cursore se ne andrebbe
+  const firma = `${rotta.tipo}|${rotta.db || ''}|${rotta.vista || ''}|${rotta.file || ''}`;
+  if (!forza && firma === FIRMA_SIDEBAR) return;
+  // la ricerca non cambia niente di ciò che la sidebar mostra: rifarla
+  // servirebbe solo a far perdere il cursore a chi sta scrivendo
+  if (!forza && rotta.tipo === 'cerca' && FIRMA_SIDEBAR !== null) return;
+  FIRMA_SIDEBAR = firma;
+
   const sb = $('#sidebar');
   sb.replaceChildren();
   sb.append(el('div', { class: 'sb-testata' }, '📒 ', 'Quaderno'));
@@ -518,6 +529,9 @@ const paginaNota = (file) => paginaElemento(file);
 
 /* quale fonte sta filtrando la pagina di ricerca */
 let FILTRO_FONTE = null;
+/* la pagina di ricerca viene costruita una volta sola e poi aggiornata:
+   ricrearla a ogni lettera faceva perdere il fuoco alla casella */
+let PAGINA_CERCA = null;
 
 function paginaCerca(q) {
   const esito = cerca(INDICE, q, 200);
@@ -531,32 +545,46 @@ function paginaCerca(q) {
   if (FILTRO_FONTE && !perFonte.has(FILTRO_FONTE)) FILTRO_FONTE = null;
   const mostrati = FILTRO_FONTE ? risultati.filter((r) => r.fonte === FILTRO_FONTE) : risultati;
 
-  const campo = el('input', {
-    class: 'cerca-grande', type: 'search', value: q, autofocus: 'autofocus',
-    placeholder: 'Cerca in tutto il Quaderno…', 'aria-label': 'Cerca',
-    oninput: (e) => {
-      const v = e.target.value.trim();
-      clearTimeout(paginaCerca._t);
-      paginaCerca._t = setTimeout(() => {
-        location.hash = v ? `#/cerca/${encodeURIComponent(v)}` : '#/';
-      }, 220);
-    },
-  });
+  if (!PAGINA_CERCA) {
+    const campo = el('input', {
+      class: 'cerca-grande', type: 'search', value: q,
+      placeholder: 'Cerca in tutto il Quaderno…', 'aria-label': 'Cerca',
+      oninput: (e) => {
+        const v = e.target.value.trim();
+        clearTimeout(paginaCerca._t);
+        paginaCerca._t = setTimeout(() => {
+          location.hash = v ? `#/cerca/${encodeURIComponent(v)}` : '#/cerca/';
+        }, 200);
+      },
+    });
+    PAGINA_CERCA = {
+      campo,
+      conteggio: el('p', { class: 'sottotitolo', style: 'margin:10px 0 0' }),
+      filtri: el('div', { class: 'cerca-filtri' }),
+      elenco: el('div', { class: 'ris-elenco' }),
+      nodo: null,
+    };
+  }
+  const P = PAGINA_CERCA;
+  // il valore si allinea solo se la casella non la sta usando qualcuno
+  if (document.activeElement !== P.campo && P.campo.value !== q) P.campo.value = q;
 
   const pasticca = (id, nome, n) => el('button', {
     class: 'pasticca', 'aria-pressed': FILTRO_FONTE === id ? 'true' : 'false',
     onclick: () => { FILTRO_FONTE = FILTRO_FONTE === id ? null : id; disegnaRotta(leggiRotta()); },
   }, nome, el('span', { class: 'pasticca-n', testo: n }));
 
-  const filtri = perFonte.size > 1 ? el('div', { class: 'cerca-filtri' },
-    el('button', {
+  P.filtri.replaceChildren();
+  if (perFonte.size > 1) {
+    P.filtri.append(el('button', {
       class: 'pasticca', 'aria-pressed': FILTRO_FONTE ? 'false' : 'true',
       onclick: () => { FILTRO_FONTE = null; disegnaRotta(leggiRotta()); },
-    }, 'Tutto', el('span', { class: 'pasticca-n', testo: risultati.length })),
-    [...perFonte].map(([id, n]) => {
+    }, 'Tutto', el('span', { class: 'pasticca-n', testo: risultati.length })));
+    for (const [id, n] of perFonte) {
       const nome = id === 'note' ? 'Note' : INDICE.database[id]?.schema.nome || id;
-      return pasticca(id, nome, n);
-    })) : null;
+      P.filtri.append(pasticca(id, nome, n));
+    }
+  }
 
   const riga = (r) => {
     const f = r.frammento;
@@ -598,22 +626,26 @@ function paginaCerca(q) {
       el('li', {}, 'Gli accenti si possono omettere: ', el('code', { testo: 'congregacao' }),
                    ' trova ', el('em', { testo: 'Congregação' }))));
 
-  return el('div', { class: 'contenitore' },
-    el('h1', { class: 'titolo-pagina', style: 'margin-top:22px', testo: 'Ricerca' }),
-    campo,
-    q ? el('p', { class: 'sottotitolo', style: 'margin:10px 0 0' },
-          risultati.length
-            ? `${esito.totale} risultat${esito.totale === 1 ? 'o' : 'i'}` +
-              (esito.totale > risultati.length ? ` (ne mostro ${risultati.length})` : '')
-            : 'Nessun risultato.')
-      : null,
-    filtri,
-    aiuto,
-    mostrati.length
-      ? el('div', { class: 'ris-elenco' }, mostrati.map(riga))
-      : (q ? el('div', { class: 'vuoto' },
+  P.conteggio.textContent = !q ? ''
+    : (risultati.length
+        ? `${esito.totale} risultat${esito.totale === 1 ? 'o' : 'i'}` +
+          (esito.totale > risultati.length ? ` (ne mostro ${risultati.length})` : '')
+        : 'Nessun risultato.');
+
+  P.elenco.replaceChildren(
+    ...(mostrati.length
+      ? mostrati.map(riga)
+      : [q ? el('div', { class: 'vuoto' },
               'Niente che corrisponda. Prova con meno parole, o togli un filtro.')
-           : null));
+           : el('div', { class: 'vuoto' },
+              'Scrivi qualcosa: cerca nei titoli e dentro il testo delle pagine.')]));
+
+  if (!P.nodo) {
+    P.nodo = el('div', { class: 'contenitore' },
+      el('h1', { class: 'titolo-pagina', style: 'margin-top:22px', testo: 'Ricerca' }),
+      P.campo, P.conteggio, P.filtri, aiuto, P.elenco);
+  }
+  return P.nodo;
 }
 
 function paginaIndice() {
@@ -816,12 +848,14 @@ async function disegnaRotta(rotta) {
       case 'impostazioni': vista = paginaImpostazioni(); break;
       default:      vista = paginaIndice();
     }
-    main.replaceChildren(vista);
+    // se la vista è già quella montata non la si ristacca: staccarla e
+    // riattaccarla farebbe perdere il fuoco a ciò che l'utente sta usando
+    if (main.firstChild !== vista) main.replaceChildren(vista);
   } catch (err) {
     main.replaceChildren(paginaErrore(err.message));
   }
   document.body.classList.remove('sidebar-aperta');
-  $('#principale').scrollTop = 0;
+  if (rotta.tipo !== 'cerca') $('#principale').scrollTop = 0;
 }
 
 /* ------------------------------------------------------------- avvio */
@@ -842,7 +876,7 @@ async function avvio() {
   addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
-      if (leggiRotta().tipo === 'cerca') $('.cerca-grande')?.focus();
+      if (leggiRotta().tipo === 'cerca') { $('.cerca-grande')?.select(); }
       else location.hash = '#/cerca/';
     }
   });
