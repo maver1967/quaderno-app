@@ -12,7 +12,7 @@
       cache, e senza rete l'app si apre comunque.
    ====================================================================== */
 
-const VERSIONE = 'quaderno-v2';
+const VERSIONE = 'quaderno-v3';
 
 const GUSCIO = [
   './',
@@ -23,6 +23,7 @@ const GUSCIO = [
   './markdown.js',
   './modifica.js',
   './dialogo.js',
+  './ricerca.js',
   './manifest.webmanifest',
   './icone/icona-192.png',
   './icone/icona-512.png',

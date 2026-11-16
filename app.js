@@ -8,6 +8,7 @@ import { creaFonte, configurazione, FonteGitHub } from './fonte.js';
 import { markdown, separaFrontmatter } from './markdown.js';
 import { controllo, salva, avviso, nuovoId, nomeFile, barraFormato } from './modifica.js';
 import { dialogo } from './dialogo.js';
+import { cerca } from './ricerca.js';
 
 let fonte = creaFonte();
 const $ = (s, r = document) => r.querySelector(s);
@@ -194,14 +195,14 @@ function disegnaSidebar(rotta) {
   sb.replaceChildren();
   sb.append(el('div', { class: 'sb-testata' }, '📒 ', 'Quaderno'));
   sb.append(el('input', {
-    class: 'sb-cerca', type: 'search', placeholder: 'Cerca…',
-    'aria-label': 'Cerca', value: rotta.tipo === 'cerca' ? rotta.q : '',
+    class: 'sb-cerca', type: 'search', placeholder: 'Cerca…  (⌘K)',
+    'aria-label': 'Cerca', value: rotta.tipo === 'cerca' ? rotta.q : '', id: 'campo-cerca',
     oninput: (e) => {
       const q = e.target.value.trim();
       clearTimeout(disegnaSidebar._t);
       disegnaSidebar._t = setTimeout(() => {
         location.hash = q ? `#/cerca/${encodeURIComponent(q)}` : '#/';
-      }, 180);
+      }, 200);
     },
   }));
 
@@ -515,29 +516,104 @@ async function paginaElemento(file) {
    regole di salvataggio. Cambia solo che non hanno proprieta' di schema. */
 const paginaNota = (file) => paginaElemento(file);
 
+/* quale fonte sta filtrando la pagina di ricerca */
+let FILTRO_FONTE = null;
+
 function paginaCerca(q) {
-  const termini = q.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').split(/\s+/).filter(Boolean);
-  const risultati = [];
-  for (const [id, db] of Object.entries(INDICE.database)) {
-    for (const e of db.elementi) {
-      const campo = (e._cerca || []).join(' ');
-      if (termini.every((t) => campo.includes(t))) risultati.push({ e, db: db.schema });
-    }
+  const esito = cerca(INDICE, q, 200);
+  const { risultati } = esito;
+
+  // conteggio per fonte, per le pasticche di filtro
+  const perFonte = new Map();
+  for (const r of risultati) {
+    perFonte.set(r.fonte, (perFonte.get(r.fonte) || 0) + 1);
   }
-  for (const n of INDICE.note) {
-    const campo = (n._cerca || []).join(' ');
-    if (termini.every((t) => campo.includes(t))) risultati.push({ e: n, nota: true });
-  }
+  if (FILTRO_FONTE && !perFonte.has(FILTRO_FONTE)) FILTRO_FONTE = null;
+  const mostrati = FILTRO_FONTE ? risultati.filter((r) => r.fonte === FILTRO_FONTE) : risultati;
+
+  const campo = el('input', {
+    class: 'cerca-grande', type: 'search', value: q, autofocus: 'autofocus',
+    placeholder: 'Cerca in tutto il Quaderno…', 'aria-label': 'Cerca',
+    oninput: (e) => {
+      const v = e.target.value.trim();
+      clearTimeout(paginaCerca._t);
+      paginaCerca._t = setTimeout(() => {
+        location.hash = v ? `#/cerca/${encodeURIComponent(v)}` : '#/';
+      }, 220);
+    },
+  });
+
+  const pasticca = (id, nome, n) => el('button', {
+    class: 'pasticca', 'aria-pressed': FILTRO_FONTE === id ? 'true' : 'false',
+    onclick: () => { FILTRO_FONTE = FILTRO_FONTE === id ? null : id; disegnaRotta(leggiRotta()); },
+  }, nome, el('span', { class: 'pasticca-n', testo: n }));
+
+  const filtri = perFonte.size > 1 ? el('div', { class: 'cerca-filtri' },
+    el('button', {
+      class: 'pasticca', 'aria-pressed': FILTRO_FONTE ? 'false' : 'true',
+      onclick: () => { FILTRO_FONTE = null; disegnaRotta(leggiRotta()); },
+    }, 'Tutto', el('span', { class: 'pasticca-n', testo: risultati.length })),
+    [...perFonte].map(([id, n]) => {
+      const nome = id === 'note' ? 'Note' : INDICE.database[id]?.schema.nome || id;
+      return pasticca(id, nome, n);
+    })) : null;
+
+  const riga = (r) => {
+    const f = r.frammento;
+    return el('button', { class: 'ris', onclick: () => apri(r.e) },
+      el('span', { class: 'ris-icona', 'aria-hidden': 'true', testo: r.e.icona || r.icona }),
+      el('span', { class: 'ris-corpo' },
+        el('span', { class: 'ris-titolo' },
+          (r.titoloParti && r.titoloParti.length)
+            ? r.titoloParti.map((pz) => pz.evidenzia
+                ? el('mark', { testo: pz.testo })
+                : document.createTextNode(pz.testo))
+            : (r.e.titolo || '(senza titolo)')),
+        f ? el('span', { class: 'ris-frammento' },
+              f.troncatoInizio ? '…' : null,
+              f.parti.map((pz) => pz.evidenzia
+                ? el('mark', { testo: pz.testo })
+                : document.createTextNode(pz.testo)),
+              f.troncatoFine ? '…' : null)
+          : null,
+        el('span', { class: 'ris-meta' },
+          el('span', { class: 'ris-fonte', testo: r.nomeFonte }),
+          r.e.status ? cella(INDICE.database[r.fonte]?.schema.proprieta.status, r.e.status) : null,
+          r.e.area ? el('span', { class: 'muto', testo: r.e.area }) : null,
+          r.e.data ? el('span', { class: 'muto', testo: dataLeggibile(r.e.data, 'DD/MM/YYYY') }) : null)));
+  };
+
+  const aiuto = el('details', { class: 'cerca-aiuto' },
+    el('summary', { testo: 'Come cercare' }),
+    el('ul', {},
+      el('li', {}, el('code', { testo: 'salario pagare' }), ' — tutte le parole devono comparire'),
+      el('li', {}, el('code', { testo: '"consiglio regionale"' }), ' — frase esatta'),
+      el('li', {}, el('code', { testo: '-pagato' }), ' — esclude chi la contiene'),
+      el('li', {}, el('code', { testo: 'area:economia' }), ' · ',
+                   el('code', { testo: 'stato:completado' }), ' · ',
+                   el('code', { testo: 'tag:documenti' }), ' — filtra su una proprietà'),
+      el('li', {}, el('code', { testo: 'db:note' }), ' — solo note (o ', el('code', { testo: 'db:tarefas' }), ')'),
+      el('li', {}, el('code', { testo: 'dopo:2026-01-01' }), ' · ',
+                   el('code', { testo: 'prima:2026-06-30' }), ' — intervallo di date'),
+      el('li', {}, 'Gli accenti si possono omettere: ', el('code', { testo: 'congregacao' }),
+                   ' trova ', el('em', { testo: 'Congregação' }))));
+
   return el('div', { class: 'contenitore' },
-    el('h1', { class: 'titolo-pagina' }, el('span', { class: 'icona', testo: '🔍' }), 'Ricerca'),
-    el('p', { class: 'sottotitolo', testo: `${risultati.length} risultati per “${q}”` }),
-    risultati.length
-      ? el('div', { class: 'lista' }, risultati.slice(0, 200).map(({ e, db, nota }) =>
-          el('div', { class: 'riga-lista', onclick: () => apri(e) },
-            el('span', { class: 'icona', testo: e.icona || (nota ? '📄' : db?.icona || '▦') }),
-            el('span', { class: 't', testo: e.titolo }),
-            el('span', { class: 'muto', testo: nota ? 'Nota' : db?.nome }))))
-      : el('div', { class: 'vuoto', testo: 'Nessun risultato.' }));
+    el('h1', { class: 'titolo-pagina', style: 'margin-top:22px', testo: 'Ricerca' }),
+    campo,
+    q ? el('p', { class: 'sottotitolo', style: 'margin:10px 0 0' },
+          risultati.length
+            ? `${esito.totale} risultat${esito.totale === 1 ? 'o' : 'i'}` +
+              (esito.totale > risultati.length ? ` (ne mostro ${risultati.length})` : '')
+            : 'Nessun risultato.')
+      : null,
+    filtri,
+    aiuto,
+    mostrati.length
+      ? el('div', { class: 'ris-elenco' }, mostrati.map(riga))
+      : (q ? el('div', { class: 'vuoto' },
+              'Niente che corrisponda. Prova con meno parole, o togli un filtro.')
+           : null));
 }
 
 function paginaIndice() {
@@ -690,6 +766,7 @@ function leggiRotta() {
   if (p[0] === 'el')    return { tipo: 'el', file: p.slice(1).join('/') };
   if (p[0] === 'nota')  return { tipo: 'nota', file: p.slice(1).join('/') };
   if (p[0] === 'cerca') return { tipo: 'cerca', q: p.slice(1).join('/') };
+  if (h === 'cerca' || h === 'cerca/') return { tipo: 'cerca', q: '' };
   if (p[0] === 'impostazioni') return { tipo: 'impostazioni' };
   return { tipo: 'indice' };
 }
@@ -762,6 +839,13 @@ async function avvio() {
     return;
   }
   addEventListener('hashchange', () => disegnaRotta(leggiRotta()));
+  addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      if (leggiRotta().tipo === 'cerca') $('.cerca-grande')?.focus();
+      else location.hash = '#/cerca/';
+    }
+  });
   $('#apri-sidebar').addEventListener('click', () => document.body.classList.toggle('sidebar-aperta'));
   $('#velo').addEventListener('click', () => document.body.classList.remove('sidebar-aperta'));
   $('#principale').addEventListener('scroll', (e) => {

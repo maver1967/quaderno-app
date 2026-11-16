@@ -18,6 +18,7 @@ personale salvato sul dispositivo. Questa repo contiene solo codice.
 | `markdown.js` | renderer Markdown |
 | `modifica.js` | editor: controlli per tipo, barra di formattazione, salvataggio |
 | `dialogo.js` | finestre di dialogo (nuova nota, nuovo elemento, icona) |
+| `ricerca.js` | analisi della richiesta, ricerca nel testo, frammenti |
 | `sw.js` | service worker: guscio installabile e apribile senza rete |
 | `manifest.webmanifest` | metadati dell'app installabile |
 
@@ -45,6 +46,24 @@ annidata con `cartella/sottocartella`) e icona.
 L'editor ha una barra di formattazione — grassetto, corsivo, codice, titolo,
 elenco, caselle da spuntare, citazione, collegamento — con ⌘B e ⌘I. Agisce
 sulla selezione: la avvolge, e se è già avvolta la sveste.
+
+## Ricerca
+
+Cerca **dentro** il testo delle pagine, non solo nei titoli, e capisce:
+
+```
+salario pagare        tutte le parole devono comparire
+"consiglio regionale" frase esatta
+-pagato               esclude
+area:economia         filtra su una proprietà
+db:note               solo le note
+dopo:2026-01-01       intervallo di date
+```
+
+Gli accenti si possono omettere: `congregacao` trova *Congregação*. La
+normalizzazione conserva la lunghezza (un carattere dentro, uno fuori), così
+le posizioni trovate valgono anche sul testo originale e il frammento si
+ritaglia nel punto giusto. ⌘K apre la ricerca da qualsiasi pagina.
 
 ## Viste
 
