@@ -212,8 +212,14 @@ function disegnaSidebar(rotta, forza = false) {
       const q = e.target.value.trim();
       clearTimeout(disegnaSidebar._t);
       disegnaSidebar._t = setTimeout(() => {
-        location.hash = q ? `#/cerca/${encodeURIComponent(q)}` : '#/';
-      }, 200);
+        if (leggiRotta().tipo === 'cerca') {
+          // già sulla ricerca: si aggiornano i risultati senza cambiare rotta
+          if (PAGINA_CERCA) PAGINA_CERCA.campo.value = q;
+          aggiornaCerca(q, true);
+        } else {
+          location.hash = q ? `#/cerca/${encodeURIComponent(q)}` : '#/';
+        }
+      }, 160);
     },
   }));
 
@@ -529,62 +535,98 @@ const paginaNota = (file) => paginaElemento(file);
 
 /* quale fonte sta filtrando la pagina di ricerca */
 let FILTRO_FONTE = null;
-/* la pagina di ricerca viene costruita una volta sola e poi aggiornata:
-   ricrearla a ogni lettera faceva perdere il fuoco alla casella */
+/* La pagina di ricerca si costruisce UNA volta. Mentre si scrive non si
+   cambia rotta e non si ridisegna niente: si aggiornano solo i tre
+   contenitori dei risultati. L'indirizzo si allinea con replaceState, che
+   NON scatena hashchange, quindi la casella non viene mai toccata. */
 let PAGINA_CERCA = null;
 
-function paginaCerca(q) {
+function costruisciPaginaCerca() {
+  const campo = el('input', {
+    class: 'cerca-grande', type: 'search',
+    placeholder: 'Cerca in tutto il Quaderno…', 'aria-label': 'Cerca',
+  });
+
+  const P = {
+    campo,
+    conteggio: el('p', { class: 'sottotitolo', style: 'margin:10px 0 0' }),
+    filtri: el('div', { class: 'cerca-filtri' }),
+    elenco: el('div', { class: 'ris-elenco' }),
+    nodo: null,
+    q: '',
+  };
+
+  campo.addEventListener('input', () => {
+    clearTimeout(P.t);
+    P.t = setTimeout(() => aggiornaCerca(campo.value.trim(), true), 160);
+  });
+
+  const aiuto = el('details', { class: 'cerca-aiuto' },
+    el('summary', { testo: 'Come cercare' }),
+    el('ul', {},
+      el('li', {}, el('code', { testo: 'salario pagare' }), ' — tutte le parole devono comparire'),
+      el('li', {}, el('code', { testo: '"consiglio regionale"' }), ' — frase esatta'),
+      el('li', {}, el('code', { testo: '-pagato' }), ' — esclude chi la contiene'),
+      el('li', {}, el('code', { testo: 'area:economia' }), ' · ',
+                   el('code', { testo: 'stato:completado' }), ' · ',
+                   el('code', { testo: 'tag:documenti' }), ' — filtra su una proprietà'),
+      el('li', {}, el('code', { testo: 'db:note' }), ' — solo note (o ',
+                   el('code', { testo: 'db:tarefas' }), ')'),
+      el('li', {}, el('code', { testo: 'dopo:2026-01-01' }), ' · ',
+                   el('code', { testo: 'prima:2026-06-30' }), ' — intervallo di date'),
+      el('li', {}, 'Gli accenti si possono omettere: ', el('code', { testo: 'congregacao' }),
+                   ' trova ', el('em', { testo: 'Congregação' }))));
+
+  P.nodo = el('div', { class: 'contenitore' },
+    el('h1', { class: 'titolo-pagina', style: 'margin-top:22px', testo: 'Ricerca' }),
+    P.campo, P.conteggio, P.filtri, aiuto, P.elenco);
+
+  return P;
+}
+
+/** Rifà i risultati per `q`. Non tocca la casella né la rotta. */
+function aggiornaCerca(q, allineaIndirizzo = false) {
+  const P = PAGINA_CERCA;
+  if (!P) return;
+  P.q = q;
+
+  if (allineaIndirizzo) {
+    // replaceState invece di location.hash: niente hashchange, niente
+    // ridisegno, il cursore resta dov'è
+    const nuovo = q ? `#/cerca/${encodeURIComponent(q)}` : '#/cerca/';
+    if (location.hash !== nuovo) history.replaceState(null, '', nuovo);
+  }
+
   const esito = cerca(INDICE, q, 200);
   const { risultati } = esito;
 
-  // conteggio per fonte, per le pasticche di filtro
   const perFonte = new Map();
-  for (const r of risultati) {
-    perFonte.set(r.fonte, (perFonte.get(r.fonte) || 0) + 1);
-  }
+  for (const r of risultati) perFonte.set(r.fonte, (perFonte.get(r.fonte) || 0) + 1);
   if (FILTRO_FONTE && !perFonte.has(FILTRO_FONTE)) FILTRO_FONTE = null;
   const mostrati = FILTRO_FONTE ? risultati.filter((r) => r.fonte === FILTRO_FONTE) : risultati;
 
-  if (!PAGINA_CERCA) {
-    const campo = el('input', {
-      class: 'cerca-grande', type: 'search', value: q,
-      placeholder: 'Cerca in tutto il Quaderno…', 'aria-label': 'Cerca',
-      oninput: (e) => {
-        const v = e.target.value.trim();
-        clearTimeout(paginaCerca._t);
-        paginaCerca._t = setTimeout(() => {
-          location.hash = v ? `#/cerca/${encodeURIComponent(v)}` : '#/cerca/';
-        }, 200);
-      },
-    });
-    PAGINA_CERCA = {
-      campo,
-      conteggio: el('p', { class: 'sottotitolo', style: 'margin:10px 0 0' }),
-      filtri: el('div', { class: 'cerca-filtri' }),
-      elenco: el('div', { class: 'ris-elenco' }),
-      nodo: null,
-    };
-  }
-  const P = PAGINA_CERCA;
-  // il valore si allinea solo se la casella non la sta usando qualcuno
-  if (document.activeElement !== P.campo && P.campo.value !== q) P.campo.value = q;
-
   const pasticca = (id, nome, n) => el('button', {
     class: 'pasticca', 'aria-pressed': FILTRO_FONTE === id ? 'true' : 'false',
-    onclick: () => { FILTRO_FONTE = FILTRO_FONTE === id ? null : id; disegnaRotta(leggiRotta()); },
+    onclick: () => { FILTRO_FONTE = FILTRO_FONTE === id ? null : id; aggiornaCerca(P.q); },
   }, nome, el('span', { class: 'pasticca-n', testo: n }));
 
   P.filtri.replaceChildren();
   if (perFonte.size > 1) {
     P.filtri.append(el('button', {
       class: 'pasticca', 'aria-pressed': FILTRO_FONTE ? 'false' : 'true',
-      onclick: () => { FILTRO_FONTE = null; disegnaRotta(leggiRotta()); },
+      onclick: () => { FILTRO_FONTE = null; aggiornaCerca(P.q); },
     }, 'Tutto', el('span', { class: 'pasticca-n', testo: risultati.length })));
     for (const [id, n] of perFonte) {
-      const nome = id === 'note' ? 'Note' : INDICE.database[id]?.schema.nome || id;
+      const nome = id === 'note' ? 'Note' : (INDICE.database[id]?.schema.nome || id);
       P.filtri.append(pasticca(id, nome, n));
     }
   }
+
+  P.conteggio.textContent = !q ? ''
+    : (risultati.length
+        ? `${esito.totale} risultat${esito.totale === 1 ? 'o' : 'i'}` +
+          (esito.totale > risultati.length ? ` (ne mostro ${risultati.length})` : '')
+        : 'Nessun risultato.');
 
   const riga = (r) => {
     const f = r.frammento;
@@ -611,40 +653,21 @@ function paginaCerca(q) {
           r.e.data ? el('span', { class: 'muto', testo: dataLeggibile(r.e.data, 'DD/MM/YYYY') }) : null)));
   };
 
-  const aiuto = el('details', { class: 'cerca-aiuto' },
-    el('summary', { testo: 'Come cercare' }),
-    el('ul', {},
-      el('li', {}, el('code', { testo: 'salario pagare' }), ' — tutte le parole devono comparire'),
-      el('li', {}, el('code', { testo: '"consiglio regionale"' }), ' — frase esatta'),
-      el('li', {}, el('code', { testo: '-pagato' }), ' — esclude chi la contiene'),
-      el('li', {}, el('code', { testo: 'area:economia' }), ' · ',
-                   el('code', { testo: 'stato:completado' }), ' · ',
-                   el('code', { testo: 'tag:documenti' }), ' — filtra su una proprietà'),
-      el('li', {}, el('code', { testo: 'db:note' }), ' — solo note (o ', el('code', { testo: 'db:tarefas' }), ')'),
-      el('li', {}, el('code', { testo: 'dopo:2026-01-01' }), ' · ',
-                   el('code', { testo: 'prima:2026-06-30' }), ' — intervallo di date'),
-      el('li', {}, 'Gli accenti si possono omettere: ', el('code', { testo: 'congregacao' }),
-                   ' trova ', el('em', { testo: 'Congregação' }))));
+  P.elenco.replaceChildren(...(
+    mostrati.length ? mostrati.map(riga)
+      : [el('div', { class: 'vuoto', testo: q
+            ? 'Niente che corrisponda. Prova con meno parole, o togli un filtro.'
+            : 'Scrivi qualcosa: cerca nei titoli e dentro il testo delle pagine.' })]));
+}
 
-  P.conteggio.textContent = !q ? ''
-    : (risultati.length
-        ? `${esito.totale} risultat${esito.totale === 1 ? 'o' : 'i'}` +
-          (esito.totale > risultati.length ? ` (ne mostro ${risultati.length})` : '')
-        : 'Nessun risultato.');
-
-  P.elenco.replaceChildren(
-    ...(mostrati.length
-      ? mostrati.map(riga)
-      : [q ? el('div', { class: 'vuoto' },
-              'Niente che corrisponda. Prova con meno parole, o togli un filtro.')
-           : el('div', { class: 'vuoto' },
-              'Scrivi qualcosa: cerca nei titoli e dentro il testo delle pagine.')]));
-
-  if (!P.nodo) {
-    P.nodo = el('div', { class: 'contenitore' },
-      el('h1', { class: 'titolo-pagina', style: 'margin-top:22px', testo: 'Ricerca' }),
-      P.campo, P.conteggio, P.filtri, aiuto, P.elenco);
-  }
+function paginaCerca(q) {
+  if (!PAGINA_CERCA) PAGINA_CERCA = costruisciPaginaCerca();
+  const P = PAGINA_CERCA;
+  // una rotta che porta una richiesta (#/cerca/mongue) la impone; una rotta
+  // vuota (#/cerca/) lascia in casella quello che c'era, così riaprire la
+  // ricerca non cancella ciò che stavi scrivendo
+  if (q && P.campo.value !== q) P.campo.value = q;
+  aggiornaCerca(q || P.campo.value.trim());
   return P.nodo;
 }
 
@@ -855,7 +878,13 @@ async function disegnaRotta(rotta) {
     main.replaceChildren(paginaErrore(err.message));
   }
   document.body.classList.remove('sidebar-aperta');
-  if (rotta.tipo !== 'cerca') $('#principale').scrollTop = 0;
+  if (rotta.tipo !== 'cerca') {
+    $('#principale').scrollTop = 0;
+  } else if (document.activeElement === document.body) {
+    // arrivando sulla ricerca si può scrivere subito, senza prendere il mouse
+    PAGINA_CERCA?.campo.focus();
+    PAGINA_CERCA?.campo.select();
+  }
 }
 
 /* ------------------------------------------------------------- avvio */
